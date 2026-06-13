@@ -5,15 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Office Attendance Tracker</title>
 
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+
 <style>
 :root{
---office:#4caf50;
---holiday:#ffd54f;
---noshow:#e53935;
+--primary:#1976d2;
+--accent:#ff6b6b;
+--success:#4caf50;
+--warning:#ffd54f;
+--danger:#e53935;
 --bg:#f4f6f8;
 --card:#ffffff;
---primary:#1976d2;
 --text:#222;
+--text-light:#666;
 }
 
 *{
@@ -26,7 +32,6 @@ font-family:system-ui,-apple-system,sans-serif;
 body{
 background:var(--bg);
 color:var(--text);
-height:100vh;
 overflow:hidden;
 }
 
@@ -36,19 +41,82 @@ display:flex;
 flex-direction:column;
 }
 
+/* HEADER */
+.header{
+background:linear-gradient(135deg, #1e3a8a, #2563eb);
+color:white;
+padding:16px 20px;
+display:flex;
+justify-content:space-between;
+align-items:center;
+box-shadow:0 18px 40px rgba(15, 23, 42, 0.12);
+position:relative;
+}
+
+.header-left{
+display:flex;
+align-items:center;
+gap:14px;
+}
+
+.logo-badge{
+width:48px;
+height:48px;
+border-radius:14px;
+background:rgba(255,255,255,0.18);
+display:flex;
+align-items:center;
+justify-content:center;
+font-weight:700;
+font-size:18px;
+letter-spacing:0.02em;
+}
+
+.header-title{
+font-size:20px;
+font-weight:700;
+line-height:1.1;
+}
+
+.header-subtitle{
+font-size:13px;
+color:rgba(255,255,255,0.85);
+margin-top:4px;
+}
+
+.header-buttons{
+display:flex;
+align-items:center;
+}
+
+.icon-btn{
+background:rgba(255,255,255,0.18);
+border:none;
+color:white;
+width:44px;
+height:44px;
+border-radius:14px;
+cursor:pointer;
+font-size:20px;
+display:flex;
+align-items:center;
+justify-content:center;
+transition:.2s ease;
+}
+
+.icon-btn:hover{
+background:rgba(255,255,255,0.28);
+transform:translateY(-1px);
+}
+
+/* CALENDAR AREA */
 .calendar-area{
 flex:1;
 padding:12px;
 overflow:auto;
 }
 
-.summary{
-background:white;
-padding:12px;
-border-top:1px solid #ddd;
-}
-
-.header{
+.nav-controls{
 display:flex;
 justify-content:space-between;
 align-items:center;
@@ -59,14 +127,29 @@ margin-bottom:10px;
 border:none;
 background:var(--primary);
 color:white;
-padding:10px 14px;
-border-radius:10px;
-font-size:16px;
+padding:8px 12px;
+border-radius:8px;
+cursor:pointer;
+font-size:14px;
+transition:.2s ease;
+font-weight:500;
+}
+
+.nav-btn:hover{
+background:var(--primary);
+transform:translateY(-2px);
+box-shadow:0 4px 12px rgba(25, 118, 210, 0.3);
+}
+
+.nav-btn:active{
+transform:translateY(0);
 }
 
 .month-title{
-font-size:20px;
+font-size:18px;
 font-weight:700;
+flex:1;
+text-align:center;
 }
 
 .weekdays{
@@ -75,7 +158,7 @@ grid-template-columns:repeat(7,1fr);
 gap:4px;
 margin-bottom:5px;
 font-weight:600;
-font-size:13px;
+font-size:12px;
 text-align:center;
 }
 
@@ -87,77 +170,83 @@ gap:4px;
 
 .day{
 background:white;
-border-radius:12px;
-min-height:54px;
+border-radius:8px;
+min-height:50px;
 display:flex;
 align-items:center;
 justify-content:center;
 position:relative;
 border:1px solid #e5e5e5;
 cursor:pointer;
-font-size:14px;
+font-size:13px;
+font-weight:500;
+transition:.2s ease;
 }
 
-.empty{
+.day:hover:not(.empty){
+transform:translateY(-2px);
+box-shadow:0 4px 12px rgba(0,0,0,0.1);
+border-color:var(--primary);
+}
+
+.day.empty{
 background:transparent;
 border:none;
+cursor:default;
 }
 
-.today{
-outline:3px solid var(--primary);
-}
-
-.office{
-background:var(--office);
+.day.office{
+background:var(--success);
 color:white;
 }
 
-.home{
+.day.home{
 background:white;
+border:2px solid var(--primary);
 }
 
-.weekend{
-background:var(--holiday);
+.day.weekend{
+background:var(--warning);
 }
 
-.holiday{
-background:var(--holiday);
+.day.holiday{
+background:var(--warning);
 }
 
-.leave{
-background:
-repeating-linear-gradient(
--45deg,
-#ffd54f,
-#ffd54f 8px,
-#c7a52d 8px,
-#c7a52d 12px
-);
+.day.leave{
+background:repeating-linear-gradient(-45deg,var(--warning),var(--warning) 8px,#c7a52d 8px,#c7a52d 12px);
 }
 
-.noShowHome{
-background:var(--noshow);
+.day.noShowHome{
+background:var(--danger);
 color:white;
 }
 
-.noShowOffice{
-background:var(--office);
+.day.noShowOffice{
+background:var(--success);
 color:white;
+position:relative;
 }
 
-.noShowOffice::after{
+.day.noShowOffice::after{
 content:"";
 position:absolute;
 inset:0;
-border-radius:12px;
-background:
-repeating-linear-gradient(
--45deg,
-transparent,
-transparent 6px,
-rgba(255,0,0,.9) 6px,
-rgba(255,0,0,.9) 10px
-);
+border-radius:8px;
+background:repeating-linear-gradient(-45deg,transparent,transparent 6px,rgba(255,0,0,.8) 6px,rgba(255,0,0,.8) 10px);
+}
+
+.day.today{
+outline:3px solid var(--accent);
+}
+
+/* SUMMARY */
+.summary{
+background:white;
+padding:12px;
+border-top:1px solid #ddd;
+max-height:200px;
+overflow-y:auto;
 }
 
 .legend{
@@ -165,7 +254,7 @@ display:flex;
 flex-wrap:wrap;
 gap:8px;
 margin-bottom:10px;
-font-size:12px;
+font-size:11px;
 }
 
 .legend-item{
@@ -175,55 +264,40 @@ gap:4px;
 }
 
 .dot{
-width:14px;
-height:14px;
-border-radius:4px;
+width:12px;
+height:12px;
+border-radius:3px;
 }
 
 .stats{
 display:grid;
 grid-template-columns:repeat(2,1fr);
-gap:8px;
-margin-top:10px;
+gap:6px;
+font-size:12px;
 }
 
-.card{
+.stat-card{
 background:#f7f9fb;
-padding:10px;
-border-radius:10px;
+padding:8px;
+border-radius:8px;
 text-align:center;
+border-left:4px solid var(--primary);
+transition:.2s ease;
 }
 
-.card b{
+.stat-card:hover{
+background:#e3f2fd;
+box-shadow:0 2px 8px rgba(0,0,0,0.05);
+}
+
+.stat-card b{
 display:block;
-font-size:18px;
-margin-top:3px;
+font-size:16px;
+margin-top:2px;
+color:var(--primary);
 }
 
-.progress-wrap{
-margin-top:10px;
-}
-
-.progress{
-height:16px;
-background:#ddd;
-border-radius:20px;
-overflow:hidden;
-}
-
-.progress-bar{
-height:100%;
-background:var(--office);
-width:0%;
-transition:.3s;
-}
-
-.progress-text{
-margin-top:5px;
-font-size:13px;
-font-weight:600;
-}
-
+/* BOTTOM SHEET */
 .sheet{
 position:fixed;
 left:0;
@@ -232,99 +306,372 @@ bottom:-100%;
 background:white;
 border-radius:20px 20px 0 0;
 padding:15px;
-transition:.3s;
+transition:.3s cubic-bezier(0.4, 0, 0.2, 1);
 box-shadow:0 -4px 15px rgba(0,0,0,.2);
 z-index:10;
+max-height:85vh;
+overflow-y:auto;
 }
 
 .sheet.show{
 bottom:0;
+animation:slideUp .3s ease;
+}
+
+@keyframes slideUp{
+from{
+opacity:0;
+transform:translateY(20px);
+}
+to{
+opacity:1;
+transform:translateY(0);
+}
 }
 
 .sheet-title{
 font-weight:700;
-margin-bottom:10px;
+margin-bottom:15px;
+text-align:center;
+font-size:16px;
+}
+
+.form-group{
+margin-bottom:12px;
+}
+
+.form-group label{
+display:block;
+margin-bottom:4px;
+font-size:13px;
+font-weight:600;
+color:var(--text-light);
+}
+
+.form-group input,
+.form-group select{
+width:100%;
+padding:10px;
+border:1px solid #ddd;
+border-radius:6px;
+font-size:13px;
+transition:.2s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus{
+outline:none;
+border-color:var(--primary);
+box-shadow:0 0 0 3px rgba(25, 118, 210, 0.1);
+}
+
+.form-row{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:10px;
+}
+
+.action-button{
+width:100%;
+padding:12px;
+margin:8px 0;
+border:none;
+border-radius:8px;
+font-size:14px;
+font-weight:600;
+cursor:pointer;
+transition:.2s ease;
+}
+
+.action-button:hover{
+transform:translateY(-2px);
+box-shadow:0 4px 12px rgba(0,0,0,0.15);
+}
+
+.action-button:active{
+transform:translateY(0);
+}
+
+.btn-primary{
+background:var(--primary);
+color:white;
+}
+
+.btn-success{
+background:var(--success);
+color:white;
+}
+
+.btn-office{
+background:var(--success);
+color:white;
+}
+
+.btn-home{
+background:var(--primary);
+color:white;
+}
+
+.btn-holiday{
+background:var(--warning);
+}
+
+.btn-leave{
+background:#ffca28;
+}
+
+.btn-danger{
+background:var(--danger);
+color:white;
+}
+
+.btn-secondary{
+background:#999;
+color:white;
+}
+
+/* NAVIGATION DRAWER */
+.drawer-overlay{
+position:fixed;
+inset:0;
+background:rgba(0,0,0,0.5);
+display:none;
+z-index:8;
+}
+
+.drawer-overlay.show{
+display:block;
+}
+
+.drawer{
+position:fixed;
+right:-400px;
+top:0;
+width:350px;
+height:100vh;
+background:white;
+transition:.3s cubic-bezier(0.4, 0, 0.2, 1);
+z-index:9;
+box-shadow:-4px 0 15px rgba(0,0,0,.2);
+overflow-y:auto;
+}
+
+.drawer.show{
+right:0;
+animation:slideInRight .3s ease;
+}
+
+@keyframes slideInRight{
+from{
+opacity:0;
+transform:translateX(20px);
+}
+to{
+opacity:1;
+transform:translateX(0);
+}
+}
+
+.drawer-header{
+background:var(--primary);
+color:white;
+padding:20px;
 text-align:center;
 }
 
-.action{
-width:100%;
-padding:12px;
-margin:5px 0;
-border:none;
-border-radius:10px;
-font-size:15px;
+.drawer-menu{
+padding:15px 0;
 }
 
-.office-btn{background:#4caf50;color:white;}
-.home-btn{background:#2196f3;color:white;}
-.holiday-btn{background:#ffd54f;}
-.leave-btn{background:#ffca28;}
-.noshow-btn{background:#e53935;color:white;}
-.reset-btn{background:#666;color:white;}
+.drawer-item{
+padding:15px 20px;
+border-bottom:1px solid #eee;
+cursor:pointer;
+display:flex;
+align-items:center;
+gap:12px;
+font-size:14px;
+}
 
+.drawer-item:hover{
+background:#f5f5f5;
+}
+
+.drawer-item-icon{
+font-size:18px;
+width:24px;
+}
+
+/* PROFILE SHEET */
+.profile-photo-container{
+text-align:center;
+margin-bottom:15px;
+}
+
+.profile-photo{
+width:120px;
+height:120px;
+border-radius:50%;
+object-fit:cover;
+border:3px solid var(--primary);
+margin:0 auto;
+display:block;
+}
+
+.photo-upload-btn{
+background:var(--primary);
+color:white;
+border:none;
+padding:8px 16px;
+border-radius:20px;
+cursor:pointer;
+font-size:12px;
+margin-top:10px;
+display:inline-block;
+}
+
+#profilePhotoInput{
+display:none;
+}
+
+/* SAVE LIMIT INDICATOR */
+.save-limit-display{
+background:#fff3cd;
+padding:12px;
+border-radius:8px;
+margin-bottom:10px;
+font-size:13px;
+text-align:center;
+border:1px solid #ffc107;
+}
+
+.save-limit-display.limit-reached{
+background:#f8d7da;
+border-color:#f5c6cb;
+color:#721c24;
+}
+
+/* MODAL */
 .backdrop{
 position:fixed;
 inset:0;
 background:rgba(0,0,0,.4);
 display:none;
 z-index:5;
+transition:.2s ease;
 }
 
 .backdrop.show{
 display:block;
+animation:fadeIn .2s ease;
 }
 
-@media(min-width:768px){
+@keyframes fadeIn{
+from{
+opacity:0;
+}
+to{
+opacity:1;
+}
+}
 
+.modal{
+position:fixed;
+left:50%;
+top:50%;
+transform:translate(-50%,-50%);
+background:white;
+padding:20px;
+border-radius:12px;
+box-shadow:0 4px 20px rgba(0,0,0,.3);
+z-index:11;
+max-width:90%;
+max-height:80vh;
+overflow-y:auto;
+display:none;
+transition:.3s ease;
+}
+
+.modal.show{
+display:block;
+animation:zoomIn .3s ease;
+}
+
+@keyframes zoomIn{
+from{
+opacity:0;
+transform:translate(-50%,-50%) scale(0.95);
+}
+to{
+opacity:1;
+transform:translate(-50%,-50%) scale(1);
+}
+}
+
+/* RESPONSIVE */
+@media(min-width:768px){
 .container{
 flex-direction:row;
 }
 
 .calendar-area{
 width:70%;
+border-right:1px solid #ddd;
 }
 
 .summary{
 width:30%;
-border-left:1px solid #ddd;
-border-top:none;
-overflow:auto;
+max-height:none;
 }
 
 .day{
 min-height:70px;
-font-size:16px;
+font-size:14px;
+}
+
+.drawer{
+width:400px;
 }
 }
+
 </style>
+
 </head>
 <body>
 
 <div class="container">
 
-<div class="calendar-area">
-
+<!-- HEADER -->
 <div class="header">
-<button class="nav-btn" id="prev">◀</button>
+<div class="header-left">
+<div class="logo-badge">AT</div>
+<div>
+<div class="header-title" id="headerTitle">Attendance Tracker</div>
+<div class="header-subtitle">Modern office attendance with local-first sync</div>
+</div>
+</div>
+<div class="header-buttons">
+<button class="icon-btn" id="drawerBtn" title="Menu">☰</button>
+</div>
+</div>
+
+<!-- CALENDAR AREA -->
+<div class="calendar-area">
+<div class="nav-controls">
+<button class="nav-btn" id="prev">◀ Prev</button>
 <div class="month-title" id="monthTitle"></div>
-<button class="nav-btn" id="next">▶</button>
+<button class="nav-btn" id="next">Next ▶</button>
 </div>
 
 <div class="weekdays">
-<div>Sun</div>
-<div>Mon</div>
-<div>Tue</div>
-<div>Wed</div>
-<div>Thu</div>
-<div>Fri</div>
-<div>Sat</div>
+<div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div>
+<div>Thu</div><div>Fri</div><div>Sat</div>
 </div>
 
 <div class="calendar" id="calendar"></div>
-
 </div>
 
+<!-- SUMMARY -->
 <div class="summary">
 
 <div class="legend">
@@ -336,301 +683,1050 @@ font-size:16px;
 
 <div class="stats" id="stats"></div>
 
-<div class="progress-wrap">
-<div class="progress">
-<div class="progress-bar" id="progressBar"></div>
-</div>
-<div class="progress-text" id="progressText"></div>
 </div>
 
 </div>
 
+<!-- DRAWER OVERLAY -->
+<div class="drawer-overlay" id="drawerOverlay"></div>
+
+<!-- DRAWER -->
+<div class="drawer" id="drawer">
+<div class="drawer-header">
+<div style="display:flex;justify-content:space-between;align-items:center;width:100%;">
+<span>Menu</span>
+<button onclick="closeDrawer()" style="background:none;border:none;color:white;font-size:24px;cursor:pointer;padding:0;">✕</button>
+</div>
+</div>
+<div class="drawer-menu">
+<div class="drawer-item" onclick="openProfileSheet();closeDrawer();">
+<span class="drawer-item-icon">👤</span>
+<span>My Profile</span>
+</div>
+<div class="drawer-item" onclick="showLogoutConfirm();closeDrawer();">
+<span class="drawer-item-icon">🚪</span>
+<span>Logout</span>
+</div>
+<div class="drawer-item" onclick="alert('Contact: support@app.com');closeDrawer();">
+<span class="drawer-item-icon">❓</span>
+<span>Help</span>
+</div>
+</div>
 </div>
 
+<!-- BACKDROP -->
 <div class="backdrop" id="backdrop"></div>
 
-<div class="sheet" id="sheet">
+<!-- LOGIN SHEET -->
+<div class="sheet" id="loginSheet">
+<div class="sheet-title">Phone Login</div>
 
-<div class="sheet-title" id="sheetDate"></div>
-
-<button class="action office-btn" onclick="setStatus('office')">
-Work From Office
-</button>
-
-<button class="action home-btn" onclick="setStatus('home')">
-Work From Home
-</button>
-
-<button class="action holiday-btn" onclick="setStatus('holiday')">
-Holiday
-</button>
-
-<button class="action leave-btn" onclick="setStatus('leave')">
-Leave
-</button>
-
-<button class="action noshow-btn" onclick="setStatus('noShowOffice')">
-No Show + Office
-</button>
-
-<button class="action noshow-btn" onclick="setStatus('noShowHome')">
-No Show + Home
-</button>
-
-<button class="action reset-btn" onclick="setStatus('reset')">
-Reset
-</button>
-
+<div id="phoneInputSection">
+<div class="form-group">
+<label>Select Country Code:</label>
+<select id="countryCodeSelect">
+<option value="+91">+91 India</option>
+<option value="+1">+1 USA/Canada</option>
+<option value="+44">+44 UK</option>
+<option value="+61">+61 Australia</option>
+<option value="+81">+81 Japan</option>
+<option value="+49">+49 Germany</option>
+<option value="+33">+33 France</option>
+<option value="+7">+7 Russia</option>
+<option value="+39">+39 Italy</option>
+<option value="+34">+34 Spain</option>
+<option value="+27">+27 South Africa</option>
+<option value="+86">+86 China</option>
+</select>
 </div>
+<div class="form-group">
+<label>Enter Mobile Number:</label>
+<input type="tel" id="phoneInput" placeholder="98765 43210" />
+</div>
+<div id="recaptcha" style="margin-bottom:10px;"></div>
+<button class="action-button btn-primary" onclick="sendOTP()">Send OTP</button>
+</div>
+
+<div id="otpInputSection" style="display:none">
+<div class="form-group">
+<label>Enter 6-Digit OTP:</label>
+<input type="text" id="otpInput" placeholder="000000" maxlength="6" />
+</div>
+<button class="action-button btn-success" onclick="verifyOTP()">Verify & Login</button>
+<button class="action-button btn-secondary" onclick="resetLogin()">Change Phone</button>
+</div>
+</div>
+
+<!-- REGISTRATION SHEET -->
+<div class="sheet" id="registrationSheet">
+<div class="sheet-title">Complete Your Profile</div>
+
+<div class="save-limit-display" id="saveLimitMsg"></div>
+
+<div class="form-group">
+<label>Mobile (Required):</label>
+<input type="tel" id="regMobile" placeholder="Already registered" disabled />
+</div>
+
+<div class="form-group">
+<label>Name:</label>
+<input type="text" id="regName" placeholder="Your name" />
+</div>
+
+<div class="form-group">
+<label>Email:</label>
+<input type="email" id="regEmail" placeholder="your@email.com" />
+</div>
+
+<div class="form-group">
+<label>Company:</label>
+<input type="text" id="regCompany" placeholder="Company name" />
+</div>
+
+<label style="font-weight:600;color:var(--text-light);margin-bottom:10px;display:block;">Office Hours:</label>
+<div class="form-row">
+<div class="form-group">
+<label>In Time (Hour):</label>
+<select id="regInTime">
+<option value="">Select hour</option>
+</select>
+</div>
+<div class="form-group">
+<label>Out Time (Hour):</label>
+<select id="regOutTime">
+<option value="">Select hour</option>
+</select>
+</div>
+</div>
+
+<button class="action-button btn-success" onclick="completeRegistration()">Save Profile</button>
+<button class="action-button btn-secondary" onclick="skipRegistration()">Skip For Now</button>
+</div>
+
+<!-- PROFILE SHEET -->
+<div class="sheet" id="profileSheet">
+<div class="sheet-title">My Profile</div>
+
+<div class="profile-photo-container">
+<img id="displayPhoto" class="profile-photo" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='35' r='20' fill='%23bbb'/%3E%3Cellipse cx='50' cy='80' rx='30' ry='25' fill='%23bbb'/%3E%3C/svg%3E" />
+<button class="photo-upload-btn" onclick="triggerPhotoUpload()">Upload Photo</button>
+<input type="file" id="profilePhotoInput" accept="image/*" onchange="uploadPhoto(event)" />
+</div>
+
+<div class="form-group">
+<label>Name:</label>
+<input type="text" id="profileName" placeholder="Your name" onchange="autoSaveProfile()" />
+</div>
+
+  <div class="form-group">
+<label>Country Code:</label>
+<select id="profileCountryCode" onchange="autoSaveProfile()">
+<option value="+91">+91 India</option>
+<option value="+1">+1 USA/Canada</option>
+<option value="+44">+44 UK</option>
+<option value="+61">+61 Australia</option>
+<option value="+81">+81 Japan</option>
+<option value="+49">+49 Germany</option>
+<option value="+33">+33 France</option>
+<option value="+7">+7 Russia</option>
+<option value="+39">+39 Italy</option>
+<option value="+34">+34 Spain</option>
+<option value="+27">+27 South Africa</option>
+<option value="+86">+86 China</option>
+</select>
+</div>
+
+<div class="form-group">
+<label>Mobile:</label>
+<input type="tel" id="profileMobile" placeholder="12345 67890" onchange="autoSaveProfile()" />
+</div>
+
+<div class="form-group">
+<label>Email:</label>
+<input type="email" id="profileEmail" placeholder="your@email.com" onchange="autoSaveProfile()" />
+</div>
+
+<div class="form-group">
+<label>Company:</label>
+<input type="text" id="profileCompany" placeholder="Company name" onchange="autoSaveProfile()" />
+</div>
+
+<label style="font-weight:600;color:var(--text-light);margin-bottom:10px;display:block;">Office Hours:</label>
+<div class="form-row">
+<div class="form-group">
+<label>In Time:</label>
+<select id="profileInTime" onchange="autoSaveProfile()"></select>
+</div>
+<div class="form-group">
+<label>Out Time:</label>
+<select id="profileOutTime" onchange="autoSaveProfile()"></select>
+</div>
+</div>
+
+<button class="action-button btn-success" onclick="saveProfile()">Save Changes</button>
+<button class="action-button btn-secondary" onclick="closeProfileSheet()">Close</button>
+</div>
+
+<!-- ATTENDANCE MARK SHEET -->
+<div class="sheet" id="attendanceSheet">
+<div class="sheet-title" id="attendanceDateTitle"></div>
+
+<div class="save-limit-display" id="attendanceLimitMsg" style="display:none;"></div>
+
+<button class="action-button btn-office" onclick="setStatus('office')">✓ Work From Office</button>
+<button class="action-button btn-home" onclick="setStatus('home')">✓ Work From Home</button>
+<button class="action-button btn-holiday" onclick="setStatus('holiday')">Holiday</button>
+<button class="action-button btn-leave" onclick="setStatus('leave')">Leave</button>
+<button class="action-button btn-danger" onclick="setStatus('noShowOffice')">✗ No Show + Office</button>
+<button class="action-button btn-danger" onclick="setStatus('noShowHome')">✗ No Show + Home</button>
+<button class="action-button btn-secondary" onclick="setStatus('reset')">Reset</button>
+</div>
+
 
 <script>
 
-let currentDate=new Date();
-let selectedKey=null;
+// ===== FIREBASE SETUP =====
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_ID",
+  appId: "YOUR_APP_ID"
+};
 
-function loadData(){
-return JSON.parse(localStorage.getItem('attendanceData')||'{}');
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+
+// ===== GLOBALS =====
+let currentUser = null;
+let currentDate = new Date();
+let selectedKey = null;
+let confirmationResult = null;
+// Deployed Google Apps Script Web App URL (set from your deployment)
+let googleScriptURL = 'https://script.google.com/macros/s/AKfycbyHdXTO6WUcjt_I0Nr0h1VEy6OkOVGdjefnLXWVdJ7DCkbPmz0_EV5Z6D94MauVwG8QPQ/exec';
+let attendanceData = {};
+let userProfile = null;
+let saveCount = 0;
+const SAVE_LIMIT = 3;
+
+// ===== AUTH FUNCTIONS =====
+function initializeAuth() {
+  auth.onAuthStateChanged(user => {
+    if (user) {
+      currentUser = user;
+      loadUserProfile(user.phoneNumber);
+      try {
+        localStorage.setItem('lastUserId', user.phoneNumber);
+        localStorage.setItem('localCalendarSaveCount', '0');
+      } catch (e) {}
+      showApp();
+    } else {
+      // Do not force login modal on load. Show app in local-only mode.
+      currentUser = null;
+      showApp();
+      // Load last-used local profile if available
+      const lastId = localStorage.getItem('lastUserId');
+      if (lastId) {
+        const lp = getLocalStorageUserProfile(lastId);
+        if (lp) {
+          userProfile = lp;
+          attendanceData = getLocalStorageAttendance(lastId);
+          render();
+        }
+      }
+    }
+  });
 }
 
-function saveData(data){
-localStorage.setItem('attendanceData',JSON.stringify(data));
+function sendOTP() {
+  const countryCode = document.getElementById('countryCodeSelect').value;
+  const phoneNumber = document.getElementById('phoneInput').value.trim();
+  const phone = `${countryCode}${phoneNumber}`;
+  
+  if (!phoneNumber) {
+    alert('Please enter mobile number');
+    return;
+  }
+
+  const bypassNumber = '+918904201135';
+  if (phone === bypassNumber) {
+    currentUser = { phoneNumber: bypassNumber };
+    checkAndShowRegistration();
+    return;
+  }
+  
+  window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha', {
+    'size': 'normal',
+    'callback': onReCaptchaSuccess
+  });
+  
+  auth.signInWithPhoneNumber(phone, window.recaptchaVerifier)
+    .then(result => {
+      confirmationResult = result;
+      document.getElementById('phoneInputSection').style.display = 'none';
+      document.getElementById('otpInputSection').style.display = 'block';
+    })
+    .catch(error => {
+      alert('Error: ' + error.message);
+      if (window.recaptchaVerifier) window.recaptchaVerifier.clear();
+    });
 }
 
-const calendar=document.getElementById('calendar');
-
-function openSheet(key,label){
-selectedKey=key;
-document.getElementById('sheetDate').innerText=label;
-document.getElementById('sheet').classList.add('show');
-document.getElementById('backdrop').classList.add('show');
+function verifyOTP() {
+  const otp = document.getElementById('otpInput').value.trim();
+  
+  if (otp.length !== 6) {
+    alert('OTP must be 6 digits');
+    return;
+  }
+  
+  confirmationResult.confirm(otp)
+    .then(result => {
+      currentUser = result.user;
+      checkAndShowRegistration();
+    })
+    .catch(error => {
+      alert('Invalid OTP: ' + error.message);
+    });
 }
 
-function closeSheet(){
-document.getElementById('sheet').classList.remove('show');
-document.getElementById('backdrop').classList.remove('show');
+function resetLogin() {
+  confirmationResult = null;
+  document.getElementById('phoneInputSection').style.display = 'block';
+  document.getElementById('otpInputSection').style.display = 'none';
+  document.getElementById('phoneInput').value = '';
+  document.getElementById('otpInput').value = '';
+  if (window.recaptchaVerifier) window.recaptchaVerifier.clear();
 }
 
-document.getElementById('backdrop').onclick=closeSheet;
-
-function setStatus(status){
-
-const data=loadData();
-
-if(status==="reset"){
-delete data[selectedKey];
-}else{
-data[selectedKey]=status;
+function onReCaptchaSuccess() {
+  console.log('reCAPTCHA verified');
 }
 
-saveData(data);
-closeSheet();
-render();
+// ===== USER PROFILE =====
+function isGoogleScriptConfigured() {
+  return googleScriptURL && googleScriptURL.trim() !== '';
 }
 
-function render(){
+function buildScriptPayload(fields) {
+  const params = new URLSearchParams();
+  Object.keys(fields).forEach(key => {
+    const value = fields[key];
+    if (value === undefined || value === null) {
+      params.append(key, '');
+    } else if (typeof value === 'object') {
+      params.append(key, JSON.stringify(value));
+    } else {
+      params.append(key, String(value));
+    }
+  });
+  return params;
+}
 
-calendar.innerHTML='';
+function getLocalStorageUserProfile(userId) {
+  try {
+    const raw = localStorage.getItem(`userProfile_${userId}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    return null;
+  }
+}
 
-const year=currentDate.getFullYear();
-const month=currentDate.getMonth();
+function setLocalStorageUserProfile(userId, userData) {
+  localStorage.setItem(`userProfile_${userId}`, JSON.stringify(userData));
+}
 
-document.getElementById('monthTitle').innerText=
-currentDate.toLocaleString('default',{
-month:'long',
-year:'numeric'
+function getLocalStorageAttendance(userId) {
+  try {
+    const raw = localStorage.getItem(`attendance_${userId}`);
+    return raw ? JSON.parse(raw) : {};
+  } catch (error) {
+    return {};
+  }
+}
+
+function setLocalStorageAttendance(userId, data) {
+  localStorage.setItem(`attendance_${userId}`, JSON.stringify(data));
+}
+
+async function loadUserProfile(userId) {
+  if (!isGoogleScriptConfigured()) {
+    document.getElementById('regMobile').value = userId;
+    populateHourSelects('reg');
+    showApp();
+    showRegistrationSheet();
+    return;
+  }
+
+  try {
+    const response = await fetch(googleScriptURL, {
+      method: 'POST',
+      body: buildScriptPayload({ action: 'getUser', userId: userId }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }
+    });
+    
+    const result = await response.json();
+    
+    if (result.success && result.data) {
+      userProfile = result.data;
+      loadAttendanceData();
+      checkSaveLimit();
+    } else {
+      // New user - show registration form
+      document.getElementById('regMobile').value = userId;
+      populateHourSelects('reg');
+      showApp();
+      showRegistrationSheet();
+    }
+  } catch (error) {
+    console.error('Failed to load profile:', error);
+    // On error, still show app with empty data
+    showApp();
+    render();
+  }
+}
+
+async function checkAndShowRegistration() {
+  const userId = currentUser.phoneNumber;
+
+  if (!isGoogleScriptConfigured()) {
+    document.getElementById('regMobile').value = userId;
+    populateHourSelects('reg');
+    showApp();
+    showRegistrationSheet();
+    return;
+  }
+  
+  try {
+    const response = await fetch(googleScriptURL, {
+      method: 'POST',
+      body: buildScriptPayload({ action: 'getUser', userId: userId }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }
+    });
+
+    const text = await response.text();
+    const result = text ? JSON.parse(text) : null;
+
+    if (!result || !result.success || !result.data) {
+      // New user - show registration
+      document.getElementById('regMobile').value = userId;
+      populateHourSelects('reg');
+      showApp();
+      showRegistrationSheet();
+    } else {
+      // Existing user
+      userProfile = result.data;
+      loadAttendanceData();
+      checkSaveLimit();
+      showApp();
+      closeSheet();
+    }
+  } catch (error) {
+    console.error('Error checking registration:', error);
+    document.getElementById('regMobile').value = userId;
+    populateHourSelects('reg');
+    showApp();
+    showRegistrationSheet();
+  }
+}
+
+async function completeRegistration() {
+  const userData = {
+    mobile: document.getElementById('regMobile').value,
+    name: document.getElementById('regName').value,
+    email: document.getElementById('regEmail').value,
+    company: document.getElementById('regCompany').value,
+    inTime: document.getElementById('regInTime').value,
+    outTime: document.getElementById('regOutTime').value,
+    profilePhoto: ''
+  };
+  
+  if (!userData.mobile) {
+    alert('Mobile is required');
+    return;
+  }
+
+  if (!isGoogleScriptConfigured()) {
+    const uid = (currentUser && currentUser.phoneNumber) || userData.mobile || 'local_user';
+    setLocalStorageUserProfile(uid, userData);
+    userProfile = userData;
+    localStorage.setItem('lastUserId', uid);
+    loadAttendanceData();
+    checkSaveLimit();
+    showApp();
+    closeRegistrationSheet();
+    alert('Profile saved locally. Configure Google Script URL later to sync remotely.');
+    return;
+  }
+  
+  try {
+    const uid = (currentUser && currentUser.phoneNumber) || userData.mobile || 'local_user';
+    const response = await fetch(googleScriptURL, {
+      method: 'POST',
+      body: buildScriptPayload({
+        action: 'saveUser',
+        userId: uid,
+        userData: userData
+      }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      userProfile = userData;
+      loadAttendanceData();
+      checkSaveLimit();
+      showApp();
+      closeRegistrationSheet();
+      alert('Profile saved successfully!');
+    }
+  } catch (error) {
+    alert('Error saving profile: ' + error.message);
+  }
+}
+
+function skipRegistration() {
+  showApp();
+  closeRegistrationSheet();
+}
+
+// ===== PROFILE PHOTO =====
+function triggerPhotoUpload() {
+  document.getElementById('profilePhotoInput').click();
+}
+
+function uploadPhoto(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const base64 = e.target.result;
+    document.getElementById('displayPhoto').src = base64;
+    if (!userProfile) {
+      userProfile = {};
+    }
+    userProfile.profilePhoto = base64;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ===== SAVE/LOAD FUNCTIONS =====
+async function loadAttendanceData(userId) {
+  const uid = userId || (currentUser && currentUser.phoneNumber) || localStorage.getItem('lastUserId') || 'local_user';
+
+  if (!isGoogleScriptConfigured()) {
+    attendanceData = getLocalStorageAttendance(uid);
+    render();
+    return;
+  }
+
+  try {
+    const response = await fetch(googleScriptURL, {
+      method: 'POST',
+      body: buildScriptPayload({
+        action: 'getAttendance',
+        userId: uid
+      }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }
+    });
+    
+    const result = await response.json();
+    attendanceData = result && result.success ? result.data : {};
+    render();
+  } catch (error) {
+    console.error('Failed to load attendance:', error);
+    attendanceData = getLocalStorageAttendance(uid);
+    render();
+  }
+}
+
+async function checkSaveLimit() {
+  if (!isGoogleScriptConfigured()) {
+    saveCount = 0;
+    const msg = document.getElementById('attendanceLimitMsg');
+    if (msg) {
+      msg.style.display = 'none';
+    }
+    return;
+  }
+
+  try {
+    const uid = (currentUser && currentUser.phoneNumber) || localStorage.getItem('lastUserId') || 'local_user';
+    const response = await fetch(googleScriptURL, {
+      method: 'POST',
+      body: buildScriptPayload({
+        action: 'checkSaveLimit',
+        userId: uid
+      }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      saveCount = result.data.count;
+      const msg = document.getElementById('attendanceLimitMsg');
+      msg.style.display = 'block';
+      msg.className = result.data.allowed ? 'save-limit-display' : 'save-limit-display limit-reached';
+      
+      if (result.data.allowed) {
+        msg.innerHTML = `📊 Cloud Syncs Today: ${result.data.count}/${result.data.limit}. Remaining: ${result.data.remaining}`;
+      } else {
+        msg.innerHTML = `⚠️ Cloud Sync Limit Reached (${result.data.count}/${result.data.limit})<br>✅ Local saves still work • Cloud sync resumes tomorrow`;
+      }
+    }
+  } catch (error) {
+    console.error('Failed to check save limit:', error);
+  }
+}
+
+async function saveAttendance(date, status) {
+  try {
+    // First, check if we can sync to Google Sheet (rate limit)
+    const uid = (currentUser && currentUser.phoneNumber) || localStorage.getItem('lastUserId') || 'local_user';
+    const limitResponse = await fetch(googleScriptURL, {
+      method: 'POST',
+      body: buildScriptPayload({
+        action: 'checkSaveLimit',
+        userId: uid
+      }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }
+    });
+    
+    const limitResult = await limitResponse.json();
+    
+    if (limitResult.success) {
+      const canSync = limitResult.data.allowed;
+      
+      // LOCAL SAVE (always works, no limit)
+      attendanceData[date] = status;
+      render();
+
+      // Track local-only calendar saves and show login after 5
+      try {
+        const key = 'localCalendarSaveCount';
+        let c = parseInt(localStorage.getItem(key) || '0', 10) || 0;
+        c += 1;
+        localStorage.setItem(key, String(c));
+        // Persist last user id placeholder if available
+        const lastId = (currentUser && currentUser.phoneNumber) || localStorage.getItem('lastUserId') || null;
+        if (lastId) localStorage.setItem('lastUserId', lastId);
+        if (c >= 5 && !currentUser) {
+          showLoginSheet();
+        }
+      } catch (e) {
+        console.warn('Failed to update local save counter', e);
+      }
+      
+      // REMOTE SYNC (limited to 2-3/day)
+      if (canSync) {
+        // Allowed to sync to Google Sheet
+        const response = await fetch(googleScriptURL, {
+          method: 'POST',
+          body: buildScriptPayload({
+            action: 'saveAttendance',
+            userId: (currentUser && currentUser.phoneNumber) || localStorage.getItem('lastUserId') || null,
+            date: date,
+            status: status
+          }),
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          console.log('✅ Saved to Google Sheet');
+        }
+      } else {
+        // Limit reached - save locally but show warning
+        console.warn('⚠️ Limit reached for Google Sheet sync');
+        alert('⚠️ Daily save limit reached!\n\nYour changes are saved locally.\nGoogle Sheet sync will resume tomorrow.');
+      }
+      
+      // Always update the limit display
+      checkSaveLimit();
+    }
+  } catch (error) {
+    console.error('Error:', error.message);
+    // Still save locally even if sync fails
+    attendanceData[date] = status;
+    render();
+  }
+}
+
+async function saveProfile(syncRemote = true) {
+  const profileCountryCode = document.getElementById('profileCountryCode').value;
+  const profileMobileValue = document.getElementById('profileMobile').value.trim();
+  const mobileValue = profileMobileValue ? `${profileCountryCode}${profileMobileValue}` : '';
+  const userData = {
+    mobile: mobileValue,
+    name: document.getElementById('profileName').value,
+    email: document.getElementById('profileEmail').value,
+    company: document.getElementById('profileCompany').value,
+    inTime: document.getElementById('profileInTime').value,
+    outTime: document.getElementById('profileOutTime').value,
+    profilePhoto: (userProfile && userProfile.profilePhoto) ? userProfile.profilePhoto : ''
+  };
+  
+  // Determine userId: prefer authenticated phoneNumber, else use profileMobile value
+  const userIdForSave = (currentUser && currentUser.phoneNumber) ? currentUser.phoneNumber : (profileMobileValue || null);
+
+  // Save locally first
+  if (userIdForSave) {
+    setLocalStorageUserProfile(userIdForSave, userData);
+    setLocalStorageAttendance(userIdForSave, attendanceData);
+    localStorage.setItem('lastUserId', userIdForSave);
+  } else {
+    // fallback to generic local key
+    setLocalStorageUserProfile('local_user', userData);
+    localStorage.setItem('lastUserId', 'local_user');
+  }
+
+  userProfile = userData;
+
+  if (!syncRemote) {
+    return;
+  }
+
+  if (!isGoogleScriptConfigured()) {
+    alert('Profile updated locally. Configure Google Script URL later to sync remotely.');
+    closeProfileSheet();
+    return;
+  }
+  
+  try {
+    const response = await fetch(googleScriptURL, {
+      method: 'POST',
+      body: buildScriptPayload({
+        action: 'saveUser',
+        userId: userIdForSave,
+        userData: userData
+      }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }
+    });
+    
+    const result = await response.json();
+    
+    if (result && result.success) {
+      userProfile = userData;
+      alert('Profile updated!');
+      closeProfileSheet();
+    } else {
+      console.warn('Profile save remote response not successful', result);
+    }
+  } catch (error) {
+    console.error('Profile save failed', error);
+    alert('Error saving profile: ' + error.message);
+  }
+}
+
+// ===== CALENDAR FUNCTIONS =====
+function setStatus(status) {
+  if (!selectedKey) return;
+  
+  if (status === 'reset') {
+    delete attendanceData[selectedKey];
+  } else {
+    attendanceData[selectedKey] = status;
+  }
+  
+  saveAttendance(selectedKey, status || null);
+  closeAttendanceSheet();
+}
+
+function render() {
+  const calendar = document.getElementById('calendar');
+  calendar.innerHTML = '';
+  
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  
+  document.getElementById('monthTitle').innerText = currentDate.toLocaleString('default', {
+    month: 'long',
+    year: 'numeric'
+  });
+  
+  const firstDay = new Date(year, month, 1).getDay();
+  const totalDays = new Date(year, month + 1, 0).getDate();
+  
+  // Empty cells
+  for (let i = 0; i < firstDay; i++) {
+    const div = document.createElement('div');
+    div.className = 'day empty';
+    calendar.appendChild(div);
+  }
+  
+  // Days
+  for (let day = 1; day <= totalDays; day++) {
+    const cell = document.createElement('div');
+    cell.className = 'day';
+    
+    const key = `${year}-${month + 1}-${day}`;
+    const dateObj = new Date(year, month, day);
+    const dow = dateObj.getDay();
+    const isWeekend = (dow === 0 || dow === 6);
+    const today = new Date();
+    
+    // Today highlight
+    if (today.getDate() === day && today.getMonth() === month && today.getFullYear() === year) {
+      cell.classList.add('today');
+    }
+    
+    cell.innerText = day;
+    let status = attendanceData[key];
+    
+    if (isWeekend) {
+      cell.classList.add('weekend');
+    }
+    
+    if (status) {
+      cell.classList.remove('weekend');
+      cell.classList.add(status);
+    }
+    
+    cell.onclick = () => openAttendanceSheet(key, dateObj.toDateString());
+    calendar.appendChild(cell);
+  }
+  
+  updateStats();
+}
+
+function updateStats() {
+  let workingDays = 0, officeDays = 0, wfhDays = 0, leaveDays = 0, holidayDays = 0, noShowDays = 0;
+  
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  const totalDays = new Date(year, month + 1, 0).getDate();
+  
+  for (let day = 1; day <= totalDays; day++) {
+    const dateObj = new Date(year, month, day);
+    const isWeekend = (dateObj.getDay() === 0 || dateObj.getDay() === 6);
+    const key = `${year}-${month + 1}-${day}`;
+    let status = attendanceData[key];
+    
+    if (isWeekend) {
+      holidayDays++;
+    } else if (!status) {
+      wfhDays++;
+      workingDays++;
+    }
+    
+    if (status) {
+      switch (status) {
+        case 'office':
+          officeDays++;
+          workingDays++;
+          break;
+        case 'home':
+          wfhDays++;
+          workingDays++;
+          break;
+        case 'holiday':
+          holidayDays++;
+          break;
+        case 'leave':
+          leaveDays++;
+          break;
+        case 'noShowHome':
+          noShowDays++;
+          wfhDays++;
+          workingDays++;
+          break;
+        case 'noShowOffice':
+          noShowDays++;
+          officeDays++;
+          workingDays++;
+          break;
+      }
+    }
+  }
+  
+  const requiredOffice = Math.ceil(workingDays * 0.5);
+  const officePercent = workingDays === 0 ? 0 : ((officeDays / workingDays) * 100).toFixed(1);
+  const remaining = Math.max(requiredOffice - officeDays, 0);
+  
+  document.getElementById('stats').innerHTML = `
+    <div class="stat-card">Working Days<b>${workingDays}</b></div>
+    <div class="stat-card">Required Office<b>${requiredOffice}</b></div>
+    <div class="stat-card">Office<b>${officeDays}</b></div>
+    <div class="stat-card">WFH<b>${wfhDays}</b></div>
+    <div class="stat-card">Leave<b>${leaveDays}</b></div>
+    <div class="stat-card">No Show<b>${noShowDays}</b></div>
+    <div style="grid-column:1/-1;font-size:12px;text-align:center;color:var(--text-light);">
+    Office: ${officePercent}% | Need ${remaining} more
+    </div>
+  `;
+}
+
+// ===== UI FUNCTIONS =====
+function populateHourSelects(prefix) {
+  const inSelect = document.getElementById(`${prefix}InTime`);
+  const outSelect = document.getElementById(`${prefix}OutTime`);
+  
+  for (let i = 0; i <= 23; i++) {
+    const option1 = document.createElement('option');
+    option1.value = i;
+    option1.text = i + ':00 (' + (i < 12 ? 'AM' : 'PM') + ')';
+    inSelect.appendChild(option1);
+    
+    const option2 = document.createElement('option');
+    option2.value = i;
+    option2.text = i + ':00 (' + (i < 12 ? 'AM' : 'PM') + ')';
+    outSelect.appendChild(option2);
+  }
+}
+
+function openAttendanceSheet(key, label) {
+  selectedKey = key;
+  document.getElementById('attendanceDateTitle').innerText = label;
+  showAttendanceSheet();
+}
+
+function openProfileSheet() {
+  // Allow opening profile sheet even if userProfile is not loaded (edit anonymously)
+  document.getElementById('profileName').value = (userProfile && userProfile.name) || '';
+  const mobileValue = (userProfile && userProfile.mobile) || '';
+  if (mobileValue && mobileValue.startsWith('+')) {
+    const match = mobileValue.match(/^(\+[0-9]{1,3})(.*)$/);
+    if (match) {
+      document.getElementById('profileCountryCode').value = match[1];
+      document.getElementById('profileMobile').value = match[2] || '';
+    } else {
+      document.getElementById('profileMobile').value = mobileValue;
+    }
+  } else {
+    document.getElementById('profileMobile').value = mobileValue;
+  }
+  document.getElementById('profileEmail').value = (userProfile && userProfile.email) || '';
+  document.getElementById('profileCompany').value = (userProfile && userProfile.company) || '';
+  document.getElementById('profileInTime').value = (userProfile && userProfile.inTime) || '';
+  document.getElementById('profileOutTime').value = (userProfile && userProfile.outTime) || '';
+
+  if (userProfile && userProfile.profilePhoto) {
+    document.getElementById('displayPhoto').src = userProfile.profilePhoto;
+  }
+
+  populateHourSelects('profile');
+  showProfileSheet();
+  closeDrawer();
+}
+
+function closeProfileSheet() {
+  document.getElementById('profileSheet').classList.remove('show');
+  document.getElementById('backdrop').classList.remove('show');
+}
+
+
+// Auto-save profile helper (debounced simple implementation)
+let _autoSaveTimer = null;
+function autoSaveProfile() {
+  if (_autoSaveTimer) clearTimeout(_autoSaveTimer);
+  _autoSaveTimer = setTimeout(() => {
+    saveProfile(false);
+  }, 700);
+}
+
+function showLogoutConfirm() {
+  if (confirm('Are you sure you want to logout?')) {
+    auth.signOut();
+  }
+}
+
+function closeSheet() {
+  document.getElementById('loginSheet').classList.remove('show');
+  document.getElementById('registrationSheet').classList.remove('show');
+  document.getElementById('attendanceSheet').classList.remove('show');
+  document.getElementById('backdrop').classList.remove('show');
+}
+
+function closeRegistrationSheet() {
+  document.getElementById('registrationSheet').classList.remove('show');
+  document.getElementById('backdrop').classList.remove('show');
+}
+
+function closeAttendanceSheet() {
+  document.getElementById('attendanceSheet').classList.remove('show');
+  document.getElementById('backdrop').classList.remove('show');
+}
+
+function showLoginSheet() {
+  document.getElementById('loginSheet').classList.add('show');
+  document.getElementById('backdrop').classList.add('show');
+}
+
+function showRegistrationSheet() {
+  document.getElementById('registrationSheet').classList.add('show');
+  document.getElementById('backdrop').classList.add('show');
+}
+
+function showAttendanceSheet() {
+  document.getElementById('attendanceSheet').classList.add('show');
+  document.getElementById('backdrop').classList.add('show');
+}
+
+function showProfileSheet() {
+  document.getElementById('profileSheet').classList.add('show');
+  document.getElementById('backdrop').classList.add('show');
+}
+
+
+function showApp() {
+  document.querySelector('.calendar-area').style.display = 'block';
+  document.querySelector('.summary').style.display = 'block';
+  render();
+}
+
+function hideApp() {
+  document.querySelector('.calendar-area').style.display = 'none';
+  document.querySelector('.summary').style.display = 'none';
+  attendanceData = {};
+}
+
+function openDrawer() {
+  document.getElementById('drawer').classList.add('show');
+  document.getElementById('drawerOverlay').classList.add('show');
+}
+
+function closeDrawer() {
+  document.getElementById('drawer').classList.remove('show');
+  document.getElementById('drawerOverlay').classList.remove('show');
+}
+
+// ===== EVENT LISTENERS =====
+document.getElementById('prev').onclick = () => {
+  currentDate.setMonth(currentDate.getMonth() - 1);
+  render();
+};
+
+document.getElementById('next').onclick = () => {
+  currentDate.setMonth(currentDate.getMonth() + 1);
+  render();
+};
+
+const profileBtn = document.getElementById('profileBtn');
+if (profileBtn) {
+  profileBtn.onclick = openProfileSheet;
+}
+
+document.getElementById('drawerBtn').onclick = openDrawer;
+
+document.getElementById('drawerOverlay').onclick = closeDrawer;
+
+document.getElementById('backdrop').onclick = () => {
+  closeSheet();
+  closeProfileSheet();
+};
+
+// ===== INIT =====
+window.addEventListener('load', () => {
+  const stored = localStorage.getItem('googleScriptURL');
+  if (stored) googleScriptURL = stored;
+  
+  initializeAuth();
 });
-
-const firstDay=new Date(year,month,1).getDay();
-const totalDays=new Date(year,month+1,0).getDate();
-
-for(let i=0;i<firstDay;i++){
-const div=document.createElement('div');
-div.className='day empty';
-calendar.appendChild(div);
-}
-
-const data=loadData();
-
-let workingDays=0;
-let officeDays=0;
-let wfhDays=0;
-let leaveDays=0;
-let holidayDays=0;
-let noShowDays=0;
-
-for(let day=1;day<=totalDays;day++){
-
-const cell=document.createElement('div');
-cell.className='day';
-
-const key=`${year}-${month+1}-${day}`;
-
-const dateObj=new Date(year,month,day);
-
-const dow=dateObj.getDay();
-
-const isWeekend=(dow===0 || dow===6);
-
-const today=new Date();
-
-if(
-today.getDate()===day &&
-today.getMonth()===month &&
-today.getFullYear()===year
-){
-cell.classList.add('today');
-}
-
-cell.innerText=day;
-
-let status=data[key];
-
-if(isWeekend){
-cell.classList.add('weekend');
-holidayDays++;
-}
-
-if(status){
-
-cell.classList.remove('weekend');
-
-switch(status){
-
-case 'office':
-cell.classList.add('office');
-officeDays++;
-workingDays++;
-break;
-
-case 'home':
-cell.classList.add('home');
-wfhDays++;
-workingDays++;
-break;
-
-case 'holiday':
-cell.classList.add('holiday');
-holidayDays++;
-break;
-
-case 'leave':
-cell.classList.add('leave');
-leaveDays++;
-break;
-
-case 'noShowHome':
-cell.classList.add('noShowHome');
-noShowDays++;
-wfhDays++;
-workingDays++;
-break;
-
-case 'noShowOffice':
-cell.classList.add('noShowOffice');
-noShowDays++;
-officeDays++;
-workingDays++;
-break;
-}
-}
-else{
-
-if(!isWeekend){
-wfhDays++;
-workingDays++;
-}
-}
-
-cell.onclick=()=>{
-openSheet(
-key,
-dateObj.toDateString()
-);
-};
-
-calendar.appendChild(cell);
-}
-
-const requiredOffice=Math.ceil(workingDays*0.5);
-
-const officePercent=
-workingDays===0
-?0
-:((officeDays/workingDays)*100).toFixed(1);
-
-const remaining=
-Math.max(
-requiredOffice-officeDays,
-0
-);
-
-document.getElementById('stats').innerHTML=`
-
-<div class="card">
-Working Days
-<b>${workingDays}</b>
-</div>
-
-<div class="card">
-Required Office
-<b>${requiredOffice}</b>
-</div>
-
-<div class="card">
-Office
-<b>${officeDays}</b>
-</div>
-
-<div class="card">
-WFH
-<b>${wfhDays}</b>
-</div>
-
-<div class="card">
-Leave
-<b>${leaveDays}</b>
-</div>
-
-<div class="card">
-No Show
-<b>${noShowDays}</b>
-</div>
-
-`;
-
-const progress=
-requiredOffice===0
-?0
-:Math.min(
-(officeDays/requiredOffice)*100,
-100
-);
-
-document.getElementById('progressBar').style.width=
-progress+'%';
-
-document.getElementById('progressText').innerHTML=
-`
-Office %: ${officePercent}%<br>
-Need ${remaining} more office day(s) to reach 50%
-`;
-}
-
-document.getElementById('prev').onclick=()=>{
-currentDate.setMonth(
-currentDate.getMonth()-1
-);
-render();
-};
-
-document.getElementById('next').onclick=()=>{
-currentDate.setMonth(
-currentDate.getMonth()+1
-);
-render();
-};
-
-render();
 
 </script>
 
