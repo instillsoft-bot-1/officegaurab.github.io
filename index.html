@@ -45,6 +45,40 @@ display:flex;
 flex-direction:column;
 }
 
+.mobile-field-with-icon{
+display:flex;
+align-items:center;
+gap:10px;
+}
+
+.mobile-field-with-icon input{
+flex:1;
+}
+
+.edit-icon-btn{
+width:44px;
+height:44px;
+border:none;
+border-radius:12px;
+background:var(--primary);
+color:white;
+cursor:pointer;
+font-size:18px;
+font-weight:700;
+display:inline-flex;
+align-items:center;
+justify-content:center;
+}
+
+.edit-icon-btn:hover{
+background:#1558b0;
+}
+
+.readonly-field{
+background:#f7f7f7;
+}
+
+
 /* HEADER */
 .header{
 background:linear-gradient(135deg, #1e3a8a, #2563eb);
@@ -859,7 +893,10 @@ width:400px;
 
 <div class="form-group">
 <label>Mobile:</label>
+<div class="mobile-field-with-icon">
 <input type="tel" id="profileMobile" placeholder="12345 67890" onchange="autoSaveProfile()" />
+<button type="button" id="profileMobileEditBtn" class="edit-icon-btn" onclick="requestMobileChange()" title="Change mobile number">✎</button>
+</div>
 </div>
 
 <div class="form-group">
@@ -923,34 +960,42 @@ function normalizeMobileNumber(value) {
   return (value || '').replace(/[^0-9]/g, '');
 }
 
-function initializeAuth() {
-  const lastUserId = localStorage.getItem('lastUserId');
-  const normalizedLastId = lastUserId && lastUserId !== 'local_user' ? normalizeMobileNumber(lastUserId) : null;
+function getLoggedInUserId() {
+  return localStorage.getItem('loggedInUserId');
+}
 
-  if (normalizedLastId) {
-    currentUser = { phoneNumber: normalizedLastId };
-    const localProfile = getLocalStorageUserProfile(normalizedLastId);
+function setLoggedInUserId(userId) {
+  if (userId) {
+    localStorage.setItem('loggedInUserId', userId);
+  }
+}
+
+function clearLoggedInUserId() {
+  localStorage.removeItem('loggedInUserId');
+}
+
+function initializeAuth() {
+  const loggedInUserId = getLoggedInUserId();
+  const normalizedLoggedInId = loggedInUserId ? normalizeMobileNumber(loggedInUserId) : null;
+
+  if (normalizedLoggedInId) {
+    currentUser = { phoneNumber: normalizedLoggedInId };
+    const localProfile = getLocalStorageUserProfile(normalizedLoggedInId);
     if (localProfile) {
       userProfile = localProfile;
     }
-    attendanceData = getLocalStorageAttendance(normalizedLastId);
+    attendanceData = getLocalStorageAttendance(normalizedLoggedInId);
     updateHeader();
     showApp();
-    loadUserProfile(normalizedLastId);
+    loadUserProfile(normalizedLoggedInId);
   } else {
-    const localUid = lastUserId || 'local_user';
-    attendanceData = getLocalStorageAttendance(localUid);
-    const localProfile = getLocalStorageUserProfile(localUid);
-    if (localProfile) {
-      userProfile = localProfile;
-    }
+    currentUser = null;
+    userProfile = null;
+    attendanceData = {};
     updateHeader();
-    if (shouldSkipLoginForCurrentMonth()) {
-      showApp();
-      render();
-    } else {
-      showLoginSheet();
-    }
+    showApp();
+    render();
+    showLoginSheet();
   }
 
   initializeSyncScheduler();
@@ -966,8 +1011,24 @@ function loginWithMobile() {
   }
 
   currentUser = { phoneNumber: normalized };
+  setLoggedInUserId(normalized);
   localStorage.setItem('lastUserId', normalized);
   localStorage.setItem('localCalendarSaveCount', '0');
+
+  const activeProfile = getLocalStorageUserProfile(normalized) || {
+    mobile: normalized,
+    name: '',
+    email: '',
+    company: '',
+    inTime: '',
+    outTime: '',
+    profilePhoto: ''
+  };
+  setLocalStorageUserProfile(normalized, activeProfile);
+  userProfile = activeProfile;
+  updateHeader();
+  showApp();
+
   loadUserProfile(normalized);
   closeLoginSheet();
 }
@@ -980,10 +1041,12 @@ function closeLoginSheet() {
 function showLogoutConfirm() {
   if (confirm('Are you sure you want to logout?')) {
     currentUser = null;
-    localStorage.removeItem('lastUserId');
+    clearLoggedInUserId();
     attendanceData = {};
     userProfile = null;
-    hideApp();
+    updateHeader();
+    render();
+    showApp();
     showLoginSheet();
   }
 }
@@ -1096,11 +1159,19 @@ async function completeRegistration() {
   }
 
   if (!isGoogleScriptConfigured()) {
-    const uid = (currentUser && currentUser.phoneNumber) || userData.mobile || 'local_user';
+    const uid = (currentUser && currentUser.phoneNumber) || userData.mobile;
+    if (!uid) {
+      showMessageModal('Login required', 'Please login with your mobile number to save profile details.');
+      return;
+    }
     setLocalStorageUserProfile(uid, userData);
     userProfile = userData;
+    setLoggedInUserId(uid);
     localStorage.setItem('lastUserId', uid);
-    loadAttendanceData();
+    if (!currentUser) {
+      currentUser = { phoneNumber: uid };
+    }
+    loadAttendanceData(uid);
     checkSaveLimit();
     showApp();
     closeRegistrationSheet();
@@ -1109,7 +1180,12 @@ async function completeRegistration() {
   }
   
   try {
-    const uid = (currentUser && currentUser.phoneNumber) || userData.mobile || 'local_user';
+    const uid = (currentUser && currentUser.phoneNumber) || userData.mobile;
+    if (!uid) {
+      showMessageModal('Login required', 'Please login with your mobile number to save profile details.');
+      return;
+    }
+
     const response = await fetch(googleScriptURL, {
       method: 'POST',
       body: buildScriptPayload({
@@ -1165,7 +1241,19 @@ function uploadPhoto(event) {
 
 // ===== SAVE/LOAD FUNCTIONS =====
 async function loadAttendanceData(userId) {
-  const uid = userId || (currentUser && currentUser.phoneNumber) || localStorage.getItem('lastUserId') || 'local_user';
+  const uid = userId || (currentUser && currentUser.phoneNumber);
+
+  if (!uid) {
+    attendanceData = {};
+    render();
+    return;
+  }
+
+  if (!uid) {
+    attendanceData = {};
+    render();
+    return;
+  }
 
   if (!isGoogleScriptConfigured()) {
     attendanceData = getLocalStorageAttendance(uid);
@@ -1203,7 +1291,12 @@ async function checkSaveLimit() {
     return;
   }
 
-  const uid = (currentUser && currentUser.phoneNumber) || localStorage.getItem('lastUserId') || 'local_user';
+  const uid = currentUser && currentUser.phoneNumber;
+  if (!uid) {
+    attendanceData = {};
+    render();
+    return;
+  }
   try {
     const response = await fetch(googleScriptURL, {
       method: 'POST',
@@ -1238,8 +1331,11 @@ async function saveAttendance(date, status) {
   try {
     console.log('saveAttendance start', date, status);
 
-    // Determine uid for local persistence
-    const uid = (currentUser && currentUser.phoneNumber) || localStorage.getItem('lastUserId') || 'local_user';
+    const uid = currentUser && currentUser.phoneNumber;
+    if (!uid) {
+      showMessageModal('Login required', 'Please login with your mobile number to save attendance.');
+      return;
+    }
 
     // LOCAL SAVE first (always)
     attendanceData[date] = status;
@@ -1290,22 +1386,18 @@ async function saveProfile(syncRemote = true) {
     profilePhoto: (userProfile && userProfile.profilePhoto) ? userProfile.profilePhoto : ''
   };
   
-  // Determine userId: prefer authenticated phoneNumber, else use normalized profile mobile
   const userIdForSave = (currentUser && currentUser.phoneNumber) ? currentUser.phoneNumber : (normalizedProfileMobile || null);
+  if (!userIdForSave) {
+    showMessageModal('Login required', 'Please login with your mobile number to save profile details.');
+    return;
+  }
 
-  // Save locally first
-  if (userIdForSave) {
-    setLocalStorageUserProfile(userIdForSave, userData);
-    setLocalStorageAttendance(userIdForSave, attendanceData);
-    localStorage.setItem('lastUserId', userIdForSave);
-    if (!currentUser) {
-      currentUser = { phoneNumber: userIdForSave };
-    }
-  } else {
-    // fallback to generic local key
-    setLocalStorageUserProfile('local_user', userData);
-    setLocalStorageAttendance('local_user', attendanceData);
-    localStorage.setItem('lastUserId', 'local_user');
+  setLocalStorageUserProfile(userIdForSave, userData);
+  setLocalStorageAttendance(userIdForSave, attendanceData);
+  setLoggedInUserId(userIdForSave);
+  localStorage.setItem('lastUserId', userIdForSave);
+  if (!currentUser) {
+    currentUser = { phoneNumber: userIdForSave };
   }
 
   userProfile = userData;
@@ -1545,6 +1637,8 @@ function updateStats() {
 function populateHourSelects(prefix) {
   const inSelect = document.getElementById(`${prefix}InTime`);
   const outSelect = document.getElementById(`${prefix}OutTime`);
+  inSelect.innerHTML = '<option value="">Select hour</option>';
+  outSelect.innerHTML = '<option value="">Select hour</option>';
   
   for (let i = 0; i <= 23; i++) {
     const option1 = document.createElement('option');
@@ -1591,8 +1685,31 @@ function openProfileSheet() {
   }
 
   populateHourSelects('profile');
+  setProfileMobileReadOnlyState(!!profileMobileValue);
   showProfileSheet();
   closeDrawer();
+}
+
+function setProfileMobileReadOnlyState(isReadOnly) {
+  const mobileInput = document.getElementById('profileMobile');
+  const editBtn = document.getElementById('profileMobileEditBtn');
+  if (!mobileInput || !editBtn) return;
+
+  mobileInput.readOnly = !!isReadOnly;
+  if (isReadOnly) {
+    mobileInput.classList.add('readonly-field');
+    editBtn.style.display = 'inline-flex';
+  } else {
+    mobileInput.classList.remove('readonly-field');
+    editBtn.style.display = 'none';
+    mobileInput.focus();
+  }
+}
+
+function requestMobileChange() {
+  closeProfileSheet();
+  showLoginSheet();
+  showMessageModal('Change Mobile', 'Enter a new mobile number to login and link your profile.');
 }
 
 function closeProfileSheet() {
@@ -1625,6 +1742,11 @@ function closeRegistrationSheet() {
 function closeAttendanceSheet() {
   document.getElementById('attendanceSheet').classList.remove('show');
   document.getElementById('backdrop').classList.remove('show');
+}
+
+function showLoginSheet() {
+  document.getElementById('loginSheet').classList.add('show');
+  document.getElementById('backdrop').classList.add('show');
 }
 
 function showRegistrationSheet() {
@@ -1751,7 +1873,11 @@ async function flushRemoteQueue() {
   const queue = getRemoteQueue();
   if (!queue.length) return;
 
-  const uid = (currentUser && currentUser.phoneNumber) || localStorage.getItem('lastUserId') || 'local_user';
+  const uid = currentUser && currentUser.phoneNumber;
+  if (!uid) {
+    updateRemoteSyncStatus(uid);
+    return;
+  }
   if (!canAttemptRemoteSync(uid)) {
     updateRemoteSyncStatus(uid);
     return;
@@ -1915,8 +2041,8 @@ function initializeSyncScheduler() {
   
   // Also set up interval-based sync every 4 hours
   setInterval(async () => {
-    const uid = (currentUser && currentUser.phoneNumber) || localStorage.getItem('lastUserId') || 'local_user';
-    if (canAttemptRemoteSync(uid)) {
+    const uid = currentUser && currentUser.phoneNumber;
+    if (uid && canAttemptRemoteSync(uid)) {
       await syncDirtyDocuments();
     }
   }, 4 * 60 * 60 * 1000);
@@ -1941,7 +2067,10 @@ function scheduleSyncAtTime(hour) {
 }
 
 async function syncDirtyDocuments() {
-  const uid = (currentUser && currentUser.phoneNumber) || localStorage.getItem('lastUserId') || 'local_user';
+  const uid = currentUser && currentUser.phoneNumber;
+  if (!uid) {
+    return;
+  }
   const dirtyDocs = getDirtyDocuments(uid);
   
   if (!dirtyDocs.length || !isGoogleScriptConfigured() || !canAttemptRemoteSync(uid)) {
@@ -2001,7 +2130,7 @@ function checkMonthlyLoginRequired() {
   localStorage.setItem('lastLoginCheckMonth', currentMonth);
 
   if (!currentUser && !shouldSkipLoginForCurrentMonth()) {
-    const hasLocalSaves = localStorage.getItem('lastUserId') !== null;
+    const hasLocalSaves = !!getLoggedInUserId() || localStorage.getItem('lastUserId') !== null;
     if (hasLocalSaves) {
       setTimeout(() => {
         showMessageModal('New Month', 'Please login to continue using the app in the new month.');
@@ -2085,7 +2214,7 @@ window.addEventListener('load', async () => {
   if (stored) googleScriptURL = stored;
   
   initializeAuth();
-  const uid = (currentUser && currentUser.phoneNumber) || localStorage.getItem('lastUserId') || 'local_user';
+  const uid = currentUser && currentUser.phoneNumber;
   await flushRemoteQueue();
   updateRemoteSyncStatus(uid);
   
